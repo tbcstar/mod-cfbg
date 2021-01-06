@@ -1,5 +1,5 @@
 #
-# Copyright (С) since 2019 Andrei Guluaev (Winfidonarleyan/Kargatum) https://github.com/Winfidonarleyan 
+# Copyright (C) since 2019 Andrei Guluaev (Winfidonarleyan/Kargatum) https://github.com/Winfidonarleyan 
 # Licence MIT https://opensource.org/MIT
 #
 
@@ -12,15 +12,15 @@
 #   CFBG
 #   
 #   CFBG.Enable
-#       Description: Enable mixed alliance and horde in one battleground 
+#       说明：在一个战场上启用联盟/部落混排
 #       Default: 1
 #
 #   CFBG.Include.Avg.Ilvl.Enable
-#       Description: Enable check average item level for bg
+#       说明：为bg启用检查平均物品等级
 #       Default: 0
 #
 #   CFBG.Players.Count.In.Group
-#       Description: Maximum players in party for enter queue
+#       说明：最多可参与排队的玩家人数
 #       Default: 3
 #
 
