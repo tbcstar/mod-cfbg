@@ -1,5 +1,5 @@
 #
-# Copyright (C) since 2019 Andrei Guluaev (Winfidonarleyan/Kargatum) https://github.com/Winfidonarleyan 
+# Copyright (С) since 2019 Andrei Guluaev (Winfidonarleyan/Kargatum) https://github.com/Winfidonarleyan
 # Licence MIT https://opensource.org/MIT
 #
 
@@ -10,7 +10,7 @@
 
 ###################################################################################################
 #   CFBG
-#   
+#
 #   CFBG.Enable
 #       说明：在一个战场上启用联盟/部落混排
 #       Default: 1
@@ -19,11 +19,16 @@
 #       说明：为bg启用检查平均物品等级
 #       Default: 0
 #
+#   CFBG.BalancedTeams
+#       说明:在BG启用检查玩家平均等级
+#       Default: 1
+#
 #   CFBG.Players.Count.In.Group
 #       说明：最多可参与排队的玩家人数
 #       Default: 3
 #
 
 CFBG.Enable = 1
+CFBG.BalancedTeams = 1
 CFBG.Include.Avg.Ilvl.Enable = 0
 CFBG.Players.Count.In.Group = 3
