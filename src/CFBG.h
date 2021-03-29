@@ -1,5 +1,6 @@
 /*
  * Copyright (С) since 2019 Andrei Guluaev (Winfidonarleyan/Kargatum) https://github.com/Winfidonarleyan
+ * Copyright (С) since 2019+ AzerothCore <www.azerothcore.org>
  * Licence MIT https://opensource.org/MIT
  */
 
@@ -17,6 +18,9 @@ enum FakeMorphs
     // FAKE_M_GOBLIN = 20582,
     // FAKE_F_GOBLIN = 20583,
 
+    // FAKE_M_UNDEAD missing
+    // FAKE_F_UNDEAD missing
+    
     FAKE_M_FEL_ORC        = 21267,
     FAKE_F_ORC            = 20316,
 
@@ -71,15 +75,20 @@ public:
     bool IsEnableSystem();
     bool IsEnableAvgIlvl();
     bool IsEnableBalancedTeams();
+    bool IsEnableEvenTeams();
+    uint32 EvenTeamsMaxPlayersThreshold();
     uint32 GetMaxPlayersCountInGroup();
+    uint32 averagePlayersLevelQueue;
+    uint32 averagePlayersItemLevelQueue;
+    uint32 joiningPlayers;
 
     uint32 GetBGTeamAverageItemLevel(Battleground* bg, TeamId team);
     uint32 GetBGTeamSumPlayerLevel(Battleground* bg, TeamId team);
     uint32 GetAllPlayersCountInBG(Battleground* bg);
 
-    TeamId GetLowerTeamIdInBG(Battleground* bg);
+    TeamId GetLowerTeamIdInBG(Battleground* bg, Player* player);
     TeamId GetLowerAvgIlvlTeamInBg(Battleground* bg);
-    TeamId GetLowerSumPlayerLvlTeamInBg(Battleground* bg);
+    TeamId SelectBgTeam(Battleground* bg, Player* player);
 
     bool IsAvgIlvlTeamsInBgEqual(Battleground* bg);
     bool SendRealNameQuery(Player* player);
@@ -118,6 +127,8 @@ private:
     bool _IsEnableSystem;
     bool _IsEnableAvgIlvl;
     bool _IsEnableBalancedTeams;
+    bool _IsEnableEvenTeams;
+    uint32 _EvenTeamsMaxPlayersThreshold;
     uint32 _MaxPlayersCountInGroup;
 
     void randomRaceMorph(uint8* race, uint32* morph, TeamId team, uint8 _class, uint8 gender);

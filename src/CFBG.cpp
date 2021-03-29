@@ -1,5 +1,6 @@
 /*
  * Copyright (С) since 2019 Andrei Guluaev (Winfidonarleyan/Kargatum) https://github.com/Winfidonarleyan
+ * Copyright (С) since 2019+ AzerothCore <www.azerothcore.org>
  * Licence MIT https://opensource.org/MIT
  */
 
@@ -24,6 +25,8 @@ void CFBG::LoadConfig()
     _IsEnableSystem = sConfigMgr->GetBoolDefault("CFBG.Enable", false);
     _IsEnableAvgIlvl = sConfigMgr->GetBoolDefault("CFBG.Include.Avg.Ilvl.Enable", false);
     _IsEnableBalancedTeams = sConfigMgr->GetBoolDefault("CFBG.BalancedTeams", false);
+    _IsEnableEvenTeams = sConfigMgr->GetBoolDefault("CFBG.EvenTeams.Enabled", false);
+    _EvenTeamsMaxPlayersThreshold = sConfigMgr->GetIntDefault("CFBG.EvenTeams.MaxPlayersThreshold", 5);
     _MaxPlayersCountInGroup = sConfigMgr->GetIntDefault("CFBG.Players.Count.In.Group", 3);
 }
 
@@ -40,6 +43,16 @@ bool CFBG::IsEnableAvgIlvl()
 bool CFBG::IsEnableBalancedTeams()
 {
     return _IsEnableBalancedTeams;
+}
+
+bool CFBG::IsEnableEvenTeams()
+{
+    return _IsEnableEvenTeams;
+}
+
+uint32 CFBG::EvenTeamsMaxPlayersThreshold()
+{
+    return _EvenTeamsMaxPlayersThreshold;
 }
 
 uint32 CFBG::GetMaxPlayersCountInGroup()
@@ -96,33 +109,32 @@ uint32 CFBG::GetBGTeamSumPlayerLevel(Battleground* bg, TeamId team)
     return sum;
 }
 
-TeamId CFBG::GetLowerTeamIdInBG(Battleground* bg)
+TeamId CFBG::GetLowerTeamIdInBG(Battleground* bg, Player* player)
 {
     int32 PlCountA = bg->GetPlayersCountByTeam(TEAM_ALLIANCE);
     int32 PlCountH = bg->GetPlayersCountByTeam(TEAM_HORDE);
     uint32 Diff = abs(PlCountA - PlCountH);
 
     if (Diff)
+    {
         return PlCountA < PlCountH ? TEAM_ALLIANCE : TEAM_HORDE;
+    }
 
     if (IsEnableBalancedTeams())
     {
-        return GetLowerSumPlayerLvlTeamInBg(bg);
+        return SelectBgTeam(bg, player);
     }
 
     if (IsEnableAvgIlvl() && !IsAvgIlvlTeamsInBgEqual(bg))
+    {
         return GetLowerAvgIlvlTeamInBg(bg);
+    }
 
-    uint8 rnd = urand(0, 1);
-
-    if (rnd)
-        return TEAM_ALLIANCE;
-
-    return TEAM_HORDE;
+    return urand(0, 1) ? TEAM_ALLIANCE : TEAM_HORDE;
 }
 
 
-TeamId CFBG::GetLowerSumPlayerLvlTeamInBg(Battleground* bg)
+TeamId CFBG::SelectBgTeam(Battleground* bg, Player *player)
 {
     uint32 playerLevelAlliance = GetBGTeamSumPlayerLevel(bg, TeamId::TEAM_ALLIANCE);
     uint32 playerLevelHorde = GetBGTeamSumPlayerLevel(bg, TeamId::TEAM_HORDE);
@@ -132,7 +144,27 @@ TeamId CFBG::GetLowerSumPlayerLvlTeamInBg(Battleground* bg)
         return GetLowerAvgIlvlTeamInBg(bg);
     }
 
-    return (playerLevelAlliance < playerLevelHorde) ? TEAM_ALLIANCE : TEAM_HORDE;
+    TeamId team = (playerLevelAlliance < playerLevelHorde) ? TEAM_ALLIANCE : TEAM_HORDE;
+
+    if (IsEnableEvenTeams())
+    {
+        if (joiningPlayers % 2 == 0)
+        {
+            // if who is joining has the level (or avg item level) lower than the average players level of the joining-queue, so who actually can enter in the battle
+            // put him in the stronger team, so swap the team
+            if (player && (player->getLevel() <  averagePlayersLevelQueue || (player->getLevel() == averagePlayersLevelQueue && player->GetAverageItemLevel() < averagePlayersItemLevelQueue)))
+            {
+                team = team == TEAM_ALLIANCE ? TEAM_HORDE : TEAM_ALLIANCE;
+            }
+        }
+
+        if (joiningPlayers > 0)
+        {
+            joiningPlayers--;
+        }
+    }
+
+    return team;
 }
 
 TeamId CFBG::GetLowerAvgIlvlTeamInBg(Battleground* bg)
@@ -322,13 +354,15 @@ void CFBG::randomRaceMorph(uint8* race, uint32* morph, TeamId team, uint8 _class
         /*
         * FEMALE morphs DWARF and NIGHT ELF are missing
         * therefore MALE and FEMALE are handled in a different way
+        *
+        * removed RACE NIGHT_ELF to prevent client crash
         */
         if (gender == GENDER_MALE) {
             *morph = FAKE_M_HUMAN;
 
             switch (_class) {
                 case CLASS_DRUID:
-                    *race = RACE_NIGHTELF;
+                    *race = RACE_HUMAN; /* RACE_NIGHTELF; */
                     *morph = FAKE_M_NIGHT_ELF;
                     break;
                 case CLASS_SHAMAN:
@@ -337,7 +371,7 @@ void CFBG::randomRaceMorph(uint8* race, uint32* morph, TeamId team, uint8 _class
                     break;
                 case CLASS_WARRIOR:
                 case CLASS_DEATH_KNIGHT:
-                    *race = getRandomRace({ RACE_HUMAN, RACE_DWARF, RACE_GNOME, RACE_NIGHTELF, RACE_DRAENEI });
+                    *race = getRandomRace({ RACE_HUMAN, RACE_DWARF, RACE_GNOME, /* RACE_NIGHTELF, */ RACE_DRAENEI });
                     *morph = getMorphFromRace(*race, gender);
                     break;
                 case CLASS_PALADIN:
@@ -345,15 +379,15 @@ void CFBG::randomRaceMorph(uint8* race, uint32* morph, TeamId team, uint8 _class
                     *morph = getMorphFromRace(*race, gender);
                     break;
                 case CLASS_HUNTER:
-                    *race = getRandomRace({ RACE_DWARF, RACE_NIGHTELF, RACE_DRAENEI });
+                    *race = getRandomRace({ RACE_DWARF, /* RACE_NIGHTELF, */ RACE_DRAENEI });
                     *morph = getMorphFromRace(*race, gender);
                     break;
                 case CLASS_ROGUE:
-                    *race = getRandomRace({ RACE_HUMAN, RACE_DWARF, RACE_GNOME, RACE_NIGHTELF });
+                    *race = getRandomRace({ RACE_HUMAN, RACE_DWARF, RACE_GNOME/* , RACE_NIGHTELF */ });
                     *morph = getMorphFromRace(*race, gender);
                     break;
                 case CLASS_PRIEST:
-                    *race = getRandomRace({ RACE_HUMAN, RACE_DWARF, RACE_NIGHTELF, RACE_DRAENEI });
+                    *race = getRandomRace({ RACE_HUMAN, RACE_DWARF, /* RACE_NIGHTELF,*/ RACE_DRAENEI });
                     *morph = getMorphFromRace(*race, gender);
                     break;
                 case CLASS_MAGE:
@@ -607,10 +641,99 @@ bool CFBG::FillPlayersToCFBG(BattlegroundQueue* bgqueue, Battleground* bg, const
     bgqueue->m_SelectionPools[TEAM_ALLIANCE].Init();
     bgqueue->m_SelectionPools[TEAM_HORDE].Init();
 
-    // quick check if nothing we can do:
-    if (!sBattlegroundMgr->isTesting())
-        if ((aliFree > hordeFree && bgqueue->m_QueuedGroups[bracket_id][BG_QUEUE_CFBG].empty()))
+    uint32 bgPlayersSize = bg->GetPlayersSize();
+
+    // if CFBG.EvenTeams is enabled, do not allow to have more player in one faction:
+    // if treshold is enabled and if the current players quantity inside the BG is greater than the treshold
+    if (IsEnableEvenTeams() && !(EvenTeamsMaxPlayersThreshold() > 0 && bgPlayersSize >= EvenTeamsMaxPlayersThreshold()*2))
+    {
+        uint32 bgQueueSize = bgqueue->m_QueuedGroups[bracket_id][BG_QUEUE_CFBG].size();
+
+        // if there is an even size of players in BG and only one in queue do not allow to join the BG
+        if (bgPlayersSize % 2 == 0 && bgQueueSize == 1) {
             return false;
+        }
+
+        // if the sum of the players in BG and the players in queue is odd, add all in BG except one
+        if ((bgPlayersSize + bgQueueSize) % 2 != 0) {
+
+            uint32 playerCount = 0;
+
+            // add to the alliance pool the players in queue except the last
+            BattlegroundQueue::GroupsQueueType::const_iterator Ali_itr = bgqueue->m_QueuedGroups[bracket_id][BG_QUEUE_CFBG].begin();
+            while (playerCount < bgQueueSize-1 && Ali_itr != bgqueue->m_QueuedGroups[bracket_id][BG_QUEUE_CFBG].end() && bgqueue->m_SelectionPools[TEAM_ALLIANCE].AddGroup((*Ali_itr), aliFree))
+            {
+                Ali_itr++;
+                playerCount++;
+            }
+
+            // add to the horde pool the players in queue except the last
+            playerCount = 0;
+            BattlegroundQueue::GroupsQueueType::const_iterator Horde_itr = bgqueue->m_QueuedGroups[bracket_id][BG_QUEUE_CFBG].begin();
+            while (playerCount < bgQueueSize-1 && Horde_itr != bgqueue->m_QueuedGroups[bracket_id][BG_QUEUE_CFBG].end() && bgqueue->m_SelectionPools[TEAM_HORDE].AddGroup((*Horde_itr), hordeFree))
+            {
+                Horde_itr++;
+                playerCount++;
+            }
+
+            return true;
+        }
+
+        /* only for EvenTeams */
+        uint32 playerCount = 0;
+        uint32 sumLevel = 0;
+        uint32 sumItemLevel = 0;
+        averagePlayersLevelQueue = 0;
+        averagePlayersItemLevelQueue = 0;
+
+        BattlegroundQueue::GroupsQueueType::const_iterator Ali_itr = bgqueue->m_QueuedGroups[bracket_id][BG_QUEUE_CFBG].begin();
+        while (Ali_itr != bgqueue->m_QueuedGroups[bracket_id][BG_QUEUE_CFBG].end() && bgqueue->m_SelectionPools[TEAM_ALLIANCE].AddGroup((*Ali_itr), aliFree))
+        {
+            if (*Ali_itr && !(*Ali_itr)->Players.empty())
+            {
+                auto playerGuid = *((*Ali_itr)->Players.begin());
+                if (auto player = ObjectAccessor::FindPlayerInOrOutOfWorld(playerGuid))
+                {
+                    sumLevel += player->getLevel();
+                    sumItemLevel += player->GetAverageItemLevel();
+                }
+            }
+            Ali_itr++;
+            playerCount++;
+        }
+
+        BattlegroundQueue::GroupsQueueType::const_iterator Horde_itr = bgqueue->m_QueuedGroups[bracket_id][BG_QUEUE_CFBG].begin();
+        while (Horde_itr != bgqueue->m_QueuedGroups[bracket_id][BG_QUEUE_CFBG].end() && bgqueue->m_SelectionPools[TEAM_HORDE].AddGroup((*Horde_itr), hordeFree))
+        {
+            if (*Horde_itr && !(*Horde_itr)->Players.empty())
+            {
+                auto playerGuid = *((*Horde_itr)->Players.begin());
+                if (auto player = ObjectAccessor::FindPlayerInOrOutOfWorld(playerGuid))
+                {
+                    sumLevel += player->getLevel();
+                    sumItemLevel += player->GetAverageItemLevel();
+                }
+            }
+            Horde_itr++;
+            playerCount++;
+        }
+
+        if (playerCount > 0 && sumLevel > 0)
+        {
+            averagePlayersLevelQueue = sumLevel / playerCount;
+            averagePlayersItemLevelQueue = sumItemLevel / playerCount;
+            joiningPlayers = playerCount;
+        }
+
+        return true;
+    }
+
+    // if CFBG.EvenTeams is disabled:
+    // quick check if nothing we can do:
+    if (!sBattlegroundMgr->isTesting() && aliFree > hordeFree && bgqueue->m_QueuedGroups[bracket_id][BG_QUEUE_CFBG].empty())
+    {
+        return false;
+    }
 
     // ally: at first fill as much as possible
     BattlegroundQueue::GroupsQueueType::const_iterator Ali_itr = bgqueue->m_QueuedGroups[bracket_id][BG_QUEUE_CFBG].begin();
